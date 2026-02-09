@@ -24,8 +24,8 @@ pub fn run(
                 WlMonitorEvent::InitialState(ref monitors) => {
                     app.set_monitors(monitors.clone());
                 }
-                WlMonitorEvent::Changed(ref monitor) => {
-                    app.update_monitor(monitor.clone());
+                WlMonitorEvent::Changed(monitor) => {
+                    app.update_monitor(*monitor);
                 }
                 WlMonitorEvent::Removed { ref name, .. } => {
                     app.remove_monitor(name);
@@ -246,12 +246,10 @@ fn render_modes(
         .modes
         .iter()
         .map(|mode| {
-            let is_current = mode.resolution.width == monitor.resolution.width
-                && mode.resolution.height == monitor.resolution.height;
-            let marker = if is_current { "▸ " } else { "  " };
+            let marker = if mode.is_current { "▸ " } else { "  " };
             let preferred = if mode.preferred { " ★" } else { "" };
 
-            let style = if is_current {
+            let style = if mode.is_current {
                 Style::default().fg(Color::Cyan)
             } else {
                 Style::default().fg(Color::White)
