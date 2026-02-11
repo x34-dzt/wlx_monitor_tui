@@ -1,18 +1,46 @@
 use std::sync::mpsc::SyncSender;
 
 use ratatui::widgets::ListState;
-use wlx_monitors::{WlMonitor, WlMonitorAction};
+use wlx_monitors::{WlMonitor, WlMonitorAction, WlTransform};
+
+pub const TRANSFORMS: [WlTransform; 8] = [
+    WlTransform::Normal,
+    WlTransform::Rotate90,
+    WlTransform::Rotate180,
+    WlTransform::Rotate270,
+    WlTransform::Flipped,
+    WlTransform::Flipped90,
+    WlTransform::Flipped180,
+    WlTransform::Flipped270,
+];
+
+pub fn transform_label(t: WlTransform) -> &'static str {
+    match t {
+        WlTransform::Normal => "Normal",
+        WlTransform::Rotate90 => "Rotate 90",
+        WlTransform::Rotate180 => "Rotate 180",
+        WlTransform::Rotate270 => "Rotate 270",
+        WlTransform::Flipped => "Flipped",
+        WlTransform::Flipped90 => "Flipped 90",
+        WlTransform::Flipped180 => "Flipped 180",
+        WlTransform::Flipped270 => "Flipped 270",
+    }
+}
 
 #[derive(PartialEq)]
 pub enum Panel {
     Monitors,
     Modes,
+    Scale,
+    Transform,
 }
 
 pub struct App {
     pub monitors: Vec<WlMonitor>,
     pub monitor_state: ListState,
     pub mode_state: ListState,
+    pub transform_state: ListState,
+    pub pending_scale: f64,
     pub panel: Panel,
     pub controller: SyncSender<WlMonitorAction>,
 }
@@ -23,6 +51,8 @@ impl App {
             monitors: Vec::new(),
             monitor_state: ListState::default(),
             mode_state: ListState::default(),
+            transform_state: ListState::default().with_selected(Some(0)),
+            pending_scale: 1.0,
             panel: Panel::Monitors,
             controller,
         }
@@ -39,6 +69,7 @@ impl App {
         if !self.monitors.is_empty() {
             self.monitor_state.select(Some(0));
             self.mode_state.select(Some(0));
+            self.sync_scale_and_transform();
         }
     }
 
@@ -48,6 +79,7 @@ impl App {
         {
             *existing = monitor;
         }
+        self.sync_scale_and_transform();
     }
 
     pub fn remove_monitor(&mut self, name: &str) {
@@ -57,6 +89,23 @@ impl App {
         {
             self.monitor_state
                 .select(Some(self.monitors.len().saturating_sub(1)));
+        }
+        self.sync_scale_and_transform();
+    }
+
+    fn sync_scale_and_transform(&mut self) {
+        let Some(idx) = self.monitor_state.selected() else {
+            return;
+        };
+        let Some(monitor) = self.monitors.get(idx) else {
+            return;
+        };
+        let scale = monitor.scale;
+        let transform = monitor.transform;
+
+        self.pending_scale = scale;
+        if let Some(tidx) = TRANSFORMS.iter().position(|&x| x == transform) {
+            self.transform_state.select(Some(tidx));
         }
     }
 
@@ -74,6 +123,7 @@ impl App {
                     .unwrap_or(0);
                 self.monitor_state.select(Some(i));
                 self.mode_state.select(Some(0));
+                self.sync_scale_and_transform();
             }
             Panel::Modes => {
                 let len =
@@ -87,6 +137,18 @@ impl App {
                     .map(|i| (i + 1) % len)
                     .unwrap_or(0);
                 self.mode_state.select(Some(i));
+            }
+            Panel::Scale => {
+                self.scale_up();
+            }
+            Panel::Transform => {
+                let len = TRANSFORMS.len();
+                let i = self
+                    .transform_state
+                    .selected()
+                    .map(|i| (i + 1) % len)
+                    .unwrap_or(0);
+                self.transform_state.select(Some(i));
             }
         }
     }
@@ -105,6 +167,7 @@ impl App {
                     .unwrap_or(0);
                 self.monitor_state.select(Some(i));
                 self.mode_state.select(Some(0));
+                self.sync_scale_and_transform();
             }
             Panel::Modes => {
                 let len =
@@ -119,13 +182,27 @@ impl App {
                     .unwrap_or(0);
                 self.mode_state.select(Some(i));
             }
+            Panel::Scale => {
+                self.scale_down();
+            }
+            Panel::Transform => {
+                let len = TRANSFORMS.len();
+                let i = self
+                    .transform_state
+                    .selected()
+                    .map(|i| if i == 0 { len - 1 } else { i - 1 })
+                    .unwrap_or(0);
+                self.transform_state.select(Some(i));
+            }
         }
     }
 
     pub fn toggle_panel(&mut self) {
         self.panel = match self.panel {
             Panel::Monitors => Panel::Modes,
-            Panel::Modes => Panel::Monitors,
+            Panel::Modes => Panel::Scale,
+            Panel::Scale => Panel::Transform,
+            Panel::Transform => Panel::Monitors,
         };
     }
 
@@ -133,11 +210,29 @@ impl App {
         if let Some(monitor) = self.selected_monitor() {
             let _ = self.controller.send(WlMonitorAction::Toggle {
                 name: monitor.name.clone(),
+                mode: None,
             });
         }
     }
 
-    pub fn apply_mode(&self) {
+    pub fn scale_up(&mut self) {
+        self.pending_scale = (self.pending_scale + 0.25).min(10.0);
+    }
+
+    pub fn scale_down(&mut self) {
+        self.pending_scale = (self.pending_scale - 0.25).max(0.5);
+    }
+
+    pub fn apply_action(&self) {
+        match self.panel {
+            Panel::Modes => self.apply_mode(),
+            Panel::Scale => self.apply_scale(),
+            Panel::Transform => self.apply_transform(),
+            _ => {}
+        }
+    }
+
+    fn apply_mode(&self) {
         let Some(monitor) = self.selected_monitor() else {
             return;
         };
@@ -152,6 +247,32 @@ impl App {
             width: mode.resolution.width,
             height: mode.resolution.height,
             refresh_rate: mode.refresh_rate,
+        });
+    }
+
+    fn apply_scale(&self) {
+        let Some(monitor) = self.selected_monitor() else {
+            return;
+        };
+        let _ = self.controller.send(WlMonitorAction::SetScale {
+            name: monitor.name.clone(),
+            scale: self.pending_scale,
+        });
+    }
+
+    fn apply_transform(&self) {
+        let Some(monitor) = self.selected_monitor() else {
+            return;
+        };
+        let Some(idx) = self.transform_state.selected() else {
+            return;
+        };
+        let Some(&transform) = TRANSFORMS.get(idx) else {
+            return;
+        };
+        let _ = self.controller.send(WlMonitorAction::SetTransform {
+            name: monitor.name.clone(),
+            transform,
         });
     }
 }
