@@ -8,11 +8,34 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, BorderType, Borders, List, ListItem, Paragraph};
+use ratatui::widgets::{
+    Block, BorderType, Borders, Clear, List, ListItem, Paragraph,
+};
 use wlx_monitors::WlMonitorEvent;
 
 use crate::app::{App, Panel, TRANSFORMS, transform_label};
 use crate::compositor::Compositor;
+
+const BG: Color = Color::Black;
+const SURFACE: Color = Color::Rgb(10, 24, 14);
+const TEXT_PRIMARY: Color = Color::Rgb(226, 244, 230);
+const TEXT_MUTED: Color = Color::Rgb(92, 120, 102);
+const ACCENT: Color = Color::Rgb(96, 255, 156);
+const ACCENT_SOFT: Color = Color::Rgb(44, 179, 104);
+const INFO: Color = Color::Rgb(122, 247, 201);
+const WARN: Color = Color::Rgb(255, 209, 92);
+const DANGER: Color = Color::Rgb(255, 94, 114);
+
+fn panel_block(title: &'static str, focused: bool) -> Block<'static> {
+    let border_color = if focused { ACCENT } else { ACCENT_SOFT };
+
+    Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(border_color).bg(SURFACE))
+        .style(Style::default().bg(SURFACE))
+        .title(format!(" {} ", title))
+}
 
 pub fn run(
     mut terminal: DefaultTerminal,
@@ -54,8 +77,9 @@ pub fn run(
                 KeyCode::Down | KeyCode::Char('j') => app.next(),
                 KeyCode::Tab => app.toggle_panel(),
                 KeyCode::Char('t') => app.toggle_monitor(),
-                KeyCode::Char('+') | KeyCode::Char('=')
-                | KeyCode::Right => app.scale_up(),
+                KeyCode::Char('+') | KeyCode::Char('=') | KeyCode::Right => {
+                    app.scale_up()
+                }
                 KeyCode::Char('-') | KeyCode::Left => app.scale_down(),
                 KeyCode::Enter => app.apply_action(),
                 _ => {}
@@ -67,6 +91,9 @@ pub fn run(
 
 fn render(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
+
+    frame.render_widget(Clear, area);
+    frame.render_widget(Block::default().style(Style::default().bg(BG)), area);
 
     let main_layout = Layout::default()
         .direction(Direction::Vertical)
@@ -85,42 +112,30 @@ fn render(frame: &mut Frame, app: &mut App) {
 
 fn render_monitor_list(frame: &mut Frame, app: &mut App, area: Rect) {
     let focused = app.panel == Panel::Monitors;
-    let border_color = if focused {
-        Color::Blue
-    } else {
-        Color::DarkGray
-    };
 
     let items: Vec<ListItem> = app
         .monitors
         .iter()
         .map(|m| {
             let indicator = if m.enabled { "●" } else { "○" };
-            let color = if m.enabled {
-                Color::Green
-            } else {
-                Color::DarkGray
-            };
+            let color = if m.enabled { ACCENT } else { TEXT_MUTED };
             Line::from(vec![
                 Span::styled(
                     format!(" {} ", indicator),
                     Style::default().fg(color),
                 ),
-                Span::styled(&m.name, Style::default().fg(Color::White)),
+                Span::styled(&m.name, Style::default().fg(TEXT_PRIMARY)),
             ])
             .into()
         })
         .collect();
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(border_color))
-        .title(" Monitors ");
+    let block = panel_block("Monitors", focused);
 
     let list = List::new(items).block(block).highlight_style(
         Style::default()
-            .bg(Color::DarkGray)
+            .bg(Color::Rgb(22, 46, 28))
+            .fg(ACCENT)
             .add_modifier(Modifier::BOLD),
     );
 
@@ -129,11 +144,7 @@ fn render_monitor_list(frame: &mut Frame, app: &mut App, area: Rect) {
 
 fn render_right_panel(frame: &mut Frame, app: &mut App, area: Rect) {
     let Some(monitor) = app.selected_monitor() else {
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(Color::DarkGray))
-            .title(" No monitor selected ");
+        let block = panel_block("No monitor selected", false);
         frame.render_widget(block, area);
         return;
     };
@@ -170,46 +181,43 @@ fn render_info_bar(
     area: Rect,
 ) {
     let status = if monitor.enabled {
-        Span::styled("enabled", Style::default().fg(Color::Green))
+        Span::styled("enabled", Style::default().fg(ACCENT))
     } else {
-        Span::styled("disabled", Style::default().fg(Color::Red))
+        Span::styled("disabled", Style::default().fg(DANGER))
     };
 
     let info = Line::from(vec![
         Span::styled(
             format!(" {} ", monitor.name),
             Style::default()
-                .fg(Color::White)
+                .fg(TEXT_PRIMARY)
                 .add_modifier(Modifier::BOLD),
         ),
-        Span::styled(" · ", Style::default().fg(Color::DarkGray)),
-        Span::styled(&monitor.description, Style::default().fg(Color::DarkGray)),
-        Span::styled(" · ", Style::default().fg(Color::DarkGray)),
+        Span::styled(" · ", Style::default().fg(TEXT_MUTED)),
+        Span::styled(&monitor.description, Style::default().fg(TEXT_MUTED)),
+        Span::styled(" · ", Style::default().fg(TEXT_MUTED)),
         Span::styled(
             format!(
                 "{}x{} ",
                 monitor.resolution.width, monitor.resolution.height
             ),
-            Style::default().fg(Color::White),
+            Style::default().fg(TEXT_PRIMARY),
         ),
-        Span::styled(" · ", Style::default().fg(Color::DarkGray)),
+        Span::styled(" · ", Style::default().fg(TEXT_MUTED)),
         Span::styled(
             format!("({}, {}) ", monitor.position.x, monitor.position.y),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(TEXT_MUTED),
         ),
-        Span::styled(" · ", Style::default().fg(Color::DarkGray)),
+        Span::styled(" · ", Style::default().fg(TEXT_MUTED)),
         Span::styled(
             format!("{}x ", monitor.scale),
-            Style::default().fg(Color::White),
+            Style::default().fg(TEXT_PRIMARY),
         ),
-        Span::styled(" · ", Style::default().fg(Color::DarkGray)),
+        Span::styled(" · ", Style::default().fg(TEXT_MUTED)),
         status,
     ]);
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(Color::DarkGray));
+    let block = panel_block("Display Info", false);
 
     frame.render_widget(Paragraph::new(info).block(block), area);
 }
@@ -221,11 +229,6 @@ fn render_modes(
     area: Rect,
 ) {
     let focused = app.panel == Panel::Modes;
-    let border_color = if focused {
-        Color::Blue
-    } else {
-        Color::DarkGray
-    };
 
     let items: Vec<ListItem> = monitor
         .modes
@@ -235,9 +238,9 @@ fn render_modes(
             let preferred = if mode.preferred { " ★" } else { "" };
 
             let style = if mode.is_current {
-                Style::default().fg(Color::Cyan)
+                Style::default().fg(INFO)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(TEXT_PRIMARY)
             };
 
             Line::from(vec![
@@ -251,21 +254,18 @@ fn render_modes(
                     ),
                     style,
                 ),
-                Span::styled(preferred, Style::default().fg(Color::Yellow)),
+                Span::styled(preferred, Style::default().fg(WARN)),
             ])
             .into()
         })
         .collect();
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(border_color))
-        .title(" Modes ");
+    let block = panel_block("Modes", focused);
 
     let list = List::new(items).block(block).highlight_style(
         Style::default()
-            .bg(Color::DarkGray)
+            .bg(Color::Rgb(22, 46, 28))
+            .fg(ACCENT)
             .add_modifier(Modifier::BOLD),
     );
 
@@ -279,11 +279,6 @@ fn render_scale(
     area: Rect,
 ) {
     let focused = app.panel == Panel::Scale;
-    let border_color = if focused {
-        Color::Blue
-    } else {
-        Color::DarkGray
-    };
 
     let current = monitor.scale;
     let pending = app.pending_scale;
@@ -299,19 +294,19 @@ fn render_scale(
     let filled_part = "━".repeat(fill.saturating_sub(1));
     let empty_part = "─".repeat(empty);
 
-    let pending_color = if changed { Color::Yellow } else { Color::White };
+    let pending_color = if changed { WARN } else { TEXT_PRIMARY };
 
     let lines = vec![
         Line::from(""),
         Line::from(vec![
-            Span::styled("  current ", Style::default().fg(Color::DarkGray)),
+            Span::styled("  current ", Style::default().fg(TEXT_MUTED)),
             Span::styled(
                 format!("{:.2}x", current),
-                Style::default().fg(Color::White),
+                Style::default().fg(TEXT_PRIMARY),
             ),
         ]),
         Line::from(vec![
-            Span::styled("  pending ", Style::default().fg(Color::DarkGray)),
+            Span::styled("  pending ", Style::default().fg(TEXT_MUTED)),
             Span::styled(
                 format!("{:.2}x", pending),
                 Style::default().fg(pending_color),
@@ -319,33 +314,28 @@ fn render_scale(
         ]),
         Line::from(""),
         Line::from(vec![
-            Span::styled(format!("  {}", filled_part), Style::default().fg(Color::Cyan)),
-            Span::styled("●", Style::default().fg(Color::White)),
-            Span::styled(empty_part, Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("  {}", filled_part),
+                Style::default().fg(INFO),
+            ),
+            Span::styled("●", Style::default().fg(ACCENT)),
+            Span::styled(empty_part, Style::default().fg(TEXT_MUTED)),
         ]),
         Line::from(""),
         if changed {
-            Line::from(vec![
-                Span::styled(
-                    "  Enter to apply",
-                    Style::default().fg(Color::Yellow),
-                ),
-            ])
+            Line::from(vec![Span::styled(
+                "  Enter to apply",
+                Style::default().fg(WARN),
+            )])
         } else {
-            Line::from(vec![
-                Span::styled(
-                    "  ↑↓ or +/- adjust",
-                    Style::default().fg(Color::DarkGray),
-                ),
-            ])
+            Line::from(vec![Span::styled(
+                "  ↑↓ or +/- adjust",
+                Style::default().fg(TEXT_MUTED),
+            )])
         },
     ];
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(border_color))
-        .title(" Scale ");
+    let block = panel_block("Scale", focused);
 
     frame.render_widget(Paragraph::new(lines).block(block), area);
 }
@@ -357,11 +347,6 @@ fn render_transform(
     area: Rect,
 ) {
     let focused = app.panel == Panel::Transform;
-    let border_color = if focused {
-        Color::Blue
-    } else {
-        Color::DarkGray
-    };
 
     let current_transform = monitor.transform;
 
@@ -371,28 +356,25 @@ fn render_transform(
             let is_current = t == current_transform;
             let marker = if is_current { " ✓" } else { "" };
             let style = if is_current {
-                Style::default().fg(Color::Cyan)
+                Style::default().fg(INFO)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(TEXT_PRIMARY)
             };
 
             Line::from(vec![
                 Span::styled(format!("  {}", transform_label(t)), style),
-                Span::styled(marker, Style::default().fg(Color::Green)),
+                Span::styled(marker, Style::default().fg(ACCENT)),
             ])
             .into()
         })
         .collect();
 
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(border_color))
-        .title(" Transform ");
+    let block = panel_block("Transform", focused);
 
     let list = List::new(items).block(block).highlight_style(
         Style::default()
-            .bg(Color::DarkGray)
+            .bg(Color::Rgb(22, 46, 28))
+            .fg(ACCENT)
             .add_modifier(Modifier::BOLD),
     );
 
@@ -401,22 +383,25 @@ fn render_transform(
 
 fn render_keybindings(frame: &mut Frame, area: Rect, compositor: Compositor) {
     let keys = Line::from(vec![
-        Span::styled(" ↑↓ ", Style::default().fg(Color::Cyan)),
-        Span::styled("navigate  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("Tab ", Style::default().fg(Color::Cyan)),
-        Span::styled("panel  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("Enter ", Style::default().fg(Color::Cyan)),
-        Span::styled("apply  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("+/- ", Style::default().fg(Color::Cyan)),
-        Span::styled("scale  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("t ", Style::default().fg(Color::Cyan)),
-        Span::styled("toggle  ", Style::default().fg(Color::DarkGray)),
-        Span::styled("q ", Style::default().fg(Color::Cyan)),
-        Span::styled("quit  ", Style::default().fg(Color::DarkGray)),
+        Span::styled(" ↑↓ ", Style::default().fg(INFO)),
+        Span::styled("navigate  ", Style::default().fg(TEXT_MUTED)),
+        Span::styled("Tab ", Style::default().fg(INFO)),
+        Span::styled("panel  ", Style::default().fg(TEXT_MUTED)),
+        Span::styled("Enter ", Style::default().fg(INFO)),
+        Span::styled("apply  ", Style::default().fg(TEXT_MUTED)),
+        Span::styled("+/- ", Style::default().fg(INFO)),
+        Span::styled("scale  ", Style::default().fg(TEXT_MUTED)),
+        Span::styled("t ", Style::default().fg(INFO)),
+        Span::styled("toggle  ", Style::default().fg(TEXT_MUTED)),
+        Span::styled("q ", Style::default().fg(INFO)),
+        Span::styled("quit  ", Style::default().fg(TEXT_MUTED)),
         Span::styled(
             format!("[{}]", compositor.label()),
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(ACCENT_SOFT),
         ),
     ]);
-    frame.render_widget(Paragraph::new(keys), area);
+    frame.render_widget(
+        Paragraph::new(keys).style(Style::default().bg(BG)),
+        area,
+    );
 }
