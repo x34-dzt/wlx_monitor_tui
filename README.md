@@ -22,7 +22,7 @@ cargo build --release
 
 **crates.io:**
 ```sh
-cargo install wlx_monitor_tui
+cargo install xwlm
 ```
 
 **AUR:**
