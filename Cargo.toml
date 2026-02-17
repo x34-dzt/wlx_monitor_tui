@@ -1,10 +1,10 @@
 [package]
 name = "xwlm"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "A TUI for managing Wayland monitor configurations (Hyprland, Sway, River)"
 license = "MIT"
-repository = "https://github.com/x34-dzt/wlx_monitor_tui"
+repository = "https://github.com/x34-dzt/xwlm"
 keywords = ["wayland", "monitor", "tui", "hyprland", "sway"]
 categories = ["command-line-utilities"]
 
