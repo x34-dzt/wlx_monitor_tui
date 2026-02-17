@@ -61,6 +61,7 @@ pub fn run(
                 KeyCode::Right | KeyCode::Char('l') => app.nav_right(),
                 KeyCode::Tab => app.toggle_panel(),
                 KeyCode::Char('t') => app.toggle_monitor(),
+                KeyCode::Char('r') => app.reset_positions(),
                 KeyCode::Char(']') => app.select_next_monitor(),
                 KeyCode::Char('[') => app.select_prev_monitor(),
                 KeyCode::Char('+') | KeyCode::Char('=') => {
@@ -758,6 +759,8 @@ fn render_keybindings(
         Span::styled("scale/zoom  ", Style::default().fg(Color::DarkGray)),
         Span::styled("t ", Style::default().fg(Color::Cyan)),
         Span::styled("toggle  ", Style::default().fg(Color::DarkGray)),
+        Span::styled("r ", Style::default().fg(Color::Cyan)),
+        Span::styled("reset  ", Style::default().fg(Color::DarkGray)),
         Span::styled("q ", Style::default().fg(Color::Cyan)),
         Span::styled("quit  ", Style::default().fg(Color::DarkGray)),
         Span::styled(

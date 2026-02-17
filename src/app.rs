@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::sync::mpsc::SyncSender;
+use std::time::Instant;
 
 use ratatui::widgets::ListState;
 use wlx_monitors::{WlMonitor, WlMonitorAction, WlTransform};
@@ -70,10 +71,8 @@ pub enum Panel {
     Transform,
 }
 
-/// Minimum step when very close to a neighbor.
-const MIN_STEP: i32 = 1;
-/// Distance threshold below which we slow down to MIN_STEP.
-const SLOW_THRESHOLD: i32 = 10;
+/// How long between key presses counts as "holding" (ms).
+const REPEAT_WINDOW_MS: u128 = 200;
 
 pub struct App {
     pub monitors: Vec<WlMonitor>,
@@ -88,6 +87,9 @@ pub struct App {
     pub compositor: Compositor,
     pub monitor_config_path: String,
     pub needs_save: bool,
+    last_move_time: Instant,
+    last_move_direction: Option<PositionDirection>,
+    move_repeat_count: u32,
 }
 
 impl App {
@@ -109,6 +111,9 @@ impl App {
             compositor,
             monitor_config_path,
             needs_save: false,
+            last_move_time: Instant::now(),
+            last_move_direction: None,
+            move_repeat_count: 0,
         }
     }
 
@@ -144,6 +149,8 @@ impl App {
             self.monitors.iter_mut().find(|m| m.name == monitor.name)
         {
             *existing = monitor;
+        } else {
+            self.monitors.push(monitor);
         }
         self.sync_panel_state();
     }
@@ -322,94 +329,27 @@ impl App {
             return;
         }
 
+        // Acceleration: if same direction pressed within the repeat window, speed up
+        let now = Instant::now();
+        let elapsed = now.duration_since(self.last_move_time).as_millis();
+        let same_direction = self
+            .last_move_direction
+            .as_ref()
+            .map(|d| std::mem::discriminant(d) == std::mem::discriminant(&direction))
+            .unwrap_or(false);
+
+        if elapsed < REPEAT_WINDOW_MS && same_direction {
+            self.move_repeat_count += 1;
+        } else {
+            self.move_repeat_count = 0;
+        }
+        self.last_move_time = now;
+        self.last_move_direction = Some(direction.clone());
+
+        let step = 1 + (self.move_repeat_count * 2) as i32;
+
         let (cur_x, cur_y) = self.display_position(self.selected_monitor);
         let (sel_w, sel_h) = effective_dimensions(selected);
-
-        // Find nearest neighbor in the movement direction and calculate distance
-        let mut nearest_dist: Option<i32> = None;
-        let mut _nearest_idx: Option<usize> = None;
-
-        for (i, m) in self.monitors.iter().enumerate() {
-            if i == self.selected_monitor || !m.enabled {
-                continue;
-            }
-            let (mx, my) = self.display_position(i);
-            let (mw, mh) = effective_dimensions(m);
-
-            // Edge-to-edge distance in the movement direction
-            let dist = match direction {
-                PositionDirection::Left => {
-                    // Only consider monitors whose right edge is to our left
-                    let right_edge = mx + mw;
-                    if right_edge <= cur_x {
-                        // Check vertical overlap (they share some y range)
-                        if cur_y < my + mh && cur_y + sel_h > my {
-                            Some(cur_x - right_edge)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }
-                PositionDirection::Right => {
-                    let left_edge = mx;
-                    if left_edge >= cur_x + sel_w {
-                        if cur_y < my + mh && cur_y + sel_h > my {
-                            Some(left_edge - (cur_x + sel_w))
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }
-                PositionDirection::Up => {
-                    let bottom_edge = my + mh;
-                    if bottom_edge <= cur_y {
-                        if cur_x < mx + mw && cur_x + sel_w > mx {
-                            Some(cur_y - bottom_edge)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }
-                PositionDirection::Down => {
-                    let top_edge = my;
-                    if top_edge >= cur_y + sel_h {
-                        if cur_x < mx + mw && cur_x + sel_w > mx {
-                            Some(top_edge - (cur_y + sel_h))
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }
-            };
-
-            if let Some(d) = dist {
-                if nearest_dist.is_none() || d < nearest_dist.unwrap() {
-                    nearest_dist = Some(d);
-                    _nearest_idx = Some(i);
-                }
-            }
-        }
-
-        // Dynamic velocity: fast when far, slow when close
-        let step = match nearest_dist {
-            Some(d) if d <= SLOW_THRESHOLD => MIN_STEP,
-            Some(d) => {
-                // Scale step: 1/10th of distance, clamped between MIN_STEP and distance
-                (d / 10).max(MIN_STEP).min(d)
-            }
-            None => {
-                // No neighbor in this direction — use a moderate step
-                50
-            }
-        };
 
         let (new_x, new_y) = match direction {
             PositionDirection::Left => (cur_x - step, cur_y),
@@ -545,5 +485,9 @@ impl App {
             name: monitor.name.clone(),
             transform,
         });
+    }
+
+    pub fn reset_positions(&mut self) {
+        self.pending_positions.clear();
     }
 }
