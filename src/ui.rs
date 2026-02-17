@@ -61,6 +61,7 @@ pub fn run(
                 KeyCode::Right | KeyCode::Char('l') => app.nav_right(),
                 KeyCode::Tab => app.toggle_panel(),
                 KeyCode::Char('t') => app.toggle_monitor(),
+                KeyCode::Char('r') => app.reset_positions(),
                 KeyCode::Char(']') => app.select_next_monitor(),
                 KeyCode::Char('[') => app.select_prev_monitor(),
                 KeyCode::Char('+') | KeyCode::Char('=') => {
@@ -182,11 +183,14 @@ fn render_modes(frame: &mut Frame, app: &mut App, area: Rect) {
         .border_style(Style::default().fg(border_color))
         .title(" Modes ");
 
-    let list = List::new(items).block(block).highlight_style(
-        Style::default()
-            .bg(Color::DarkGray)
-            .add_modifier(Modifier::BOLD),
-    );
+    let list = List::new(items)
+        .block(block)
+        .highlight_symbol(" › ")
+        .highlight_style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        );
 
     frame.render_stateful_widget(list, area, &mut app.mode_state);
 }
@@ -731,11 +735,14 @@ fn render_transform(
         .border_style(Style::default().fg(border_color))
         .title(" Transform ");
 
-    let list = List::new(items).block(block).highlight_style(
-        Style::default()
-            .bg(Color::DarkGray)
-            .add_modifier(Modifier::BOLD),
-    );
+    let list = List::new(items)
+        .block(block)
+        .highlight_symbol(" › ")
+        .highlight_style(
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        );
 
     frame.render_stateful_widget(list, area, &mut app.transform_state);
 }
@@ -746,7 +753,14 @@ fn render_keybindings(
     compositor: Compositor,
 ) {
     let keys = Line::from(vec![
-        Span::styled(" Tab ", Style::default().fg(Color::Cyan)),
+        Span::styled(
+            " xwlm ",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("│ ", Style::default().fg(Color::DarkGray)),
+        Span::styled("Tab ", Style::default().fg(Color::Cyan)),
         Span::styled("panel  ", Style::default().fg(Color::DarkGray)),
         Span::styled("↑↓ ", Style::default().fg(Color::Cyan)),
         Span::styled("navigate  ", Style::default().fg(Color::DarkGray)),
@@ -758,6 +772,8 @@ fn render_keybindings(
         Span::styled("scale/zoom  ", Style::default().fg(Color::DarkGray)),
         Span::styled("t ", Style::default().fg(Color::Cyan)),
         Span::styled("toggle  ", Style::default().fg(Color::DarkGray)),
+        Span::styled("r ", Style::default().fg(Color::Cyan)),
+        Span::styled("reset  ", Style::default().fg(Color::DarkGray)),
         Span::styled("q ", Style::default().fg(Color::Cyan)),
         Span::styled("quit  ", Style::default().fg(Color::DarkGray)),
         Span::styled(
