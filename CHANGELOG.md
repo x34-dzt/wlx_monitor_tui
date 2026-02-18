@@ -17,6 +17,8 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - Workspace changes now save immediately instead of on next event loop
+- River config now generates valid `wlr-randr` commands instead of nonexistent `riverctl` commands
+- River config now includes monitor positions and disabled monitors
 
 ## [0.1.2] - 2026-02-18
 

@@ -45,10 +45,21 @@ Then just run `xwlm`. On first launch it'll ask where to save your monitor confi
 | `r` | Reset positions |
 | `q` | Quit |
 
+## Compositor Support
+
+| Compositor | Status | Notes |
+|------------|--------|-------|
+| Hyprland | Tested | Fully supported and actively tested |
+| Sway | Untested | Should work — implements the same `wlr-output-management-unstable-v1` protocol |
+| River | Untested | Should work — implements the same protocol. Config persistence uses `wlr-randr` commands |
+
+All compositors share the same Wayland protocol (`zwlr_output_management_v1`) for live monitor changes via [wlx_monitors](https://github.com/x34-dzt/wlx_monitors), a Rust library built for this project. The only differences are in config file format and reload mechanism. If you run into issues on Sway or River, please [open an issue](https://github.com/x34-dzt/xwlm/issues).
+
 ## Requirements
 
 - Wayland session (Hyprland, Sway, or River)
 - Terminal with Unicode support
+- `wlr-randr` (River only, for config persistence)
 
 ## License
 

@@ -239,19 +239,15 @@ fn format_river(monitors: &[WlMonitor]) -> String {
     let mut lines = vec!["#!/bin/sh".to_string()];
     for m in monitors {
         if !m.enabled {
+            lines.push(format!("wlr-randr --output {} --off", m.name));
             continue;
         }
         let (w, h, refresh) = current_mode(m);
         let scale = format_scale(m.scale);
         let transform = transform_to_sway(m.transform);
         lines.push(format!(
-            "riverctl output-mode {} {}x{}@{}",
-            m.name, w, h, refresh,
-        ));
-        lines.push(format!("riverctl output-scale {} {}", m.name, scale));
-        lines.push(format!(
-            "riverctl output-transform {} {}",
-            m.name, transform,
+            "wlr-randr --output {} --mode {}x{}@{}Hz --pos {},{} --scale {} --transform {}",
+            m.name, w, h, refresh, m.position.x, m.position.y, scale, transform,
         ));
     }
     lines.push(String::new());
