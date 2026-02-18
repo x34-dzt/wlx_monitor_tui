@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.3] - 2026-02-18
+
+### Added
+- Workspace panel for assigning workspaces to monitors
+- Workspace config parsing, formatting, and compositor reload on save
+- Warning modal before disabling the last enabled monitor
+- Contextual keybinding hints in panel titles when focused
+- Curl install script and GitHub Pages deployment
+
+### Changed
+- Scale step size reduced from 0.25 to 0.1 for finer granularity
+- Removed duplicate keybinding bar from monitor layout panel
+
+### Fixed
+- Workspace changes now save immediately instead of on next event loop
+
 ## [0.1.2] - 2026-02-18
 
 ### Changed
