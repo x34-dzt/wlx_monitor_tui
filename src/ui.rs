@@ -296,11 +296,26 @@ fn render_modes(frame: &mut Frame, app: &mut App, area: Rect) {
         })
         .unwrap_or_default();
 
+    let title = if focused {
+        Line::from(vec![
+            Span::styled(" Modes ", Style::default().fg(Color::Blue)),
+            Span::styled(
+                "\u{2191}\u{2193} select ",
+                Style::default().fg(Color::DarkGray),
+            ),
+        ])
+    } else {
+        Line::from(Span::styled(
+            " Modes ",
+            Style::default().fg(Color::DarkGray),
+        ))
+    };
+
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(border_color))
-        .title(" Modes ");
+        .title(title);
 
     let list = List::new(items)
         .block(block)
@@ -395,11 +410,26 @@ fn render_map(frame: &mut Frame, app: &App, area: Rect) {
         Color::DarkGray
     };
 
+    let title = if focused {
+        Line::from(vec![
+            Span::styled(" Monitor Layout ", Style::default().fg(Color::Blue)),
+            Span::styled(
+                "\u{2190}\u{2191}\u{2192}\u{2193} move  +/- zoom  [] switch  t on/off ",
+                Style::default().fg(Color::DarkGray),
+            ),
+        ])
+    } else {
+        Line::from(Span::styled(
+            " Monitor Layout ",
+            Style::default().fg(Color::DarkGray),
+        ))
+    };
+
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(border_color))
-        .title(" Monitor Layout ");
+        .title(title);
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -408,8 +438,7 @@ fn render_map(frame: &mut Frame, app: &App, area: Rect) {
         return;
     }
 
-    // Reserve 2 lines at bottom for info inside the map
-    let grid_height = inner.height.saturating_sub(2) as usize;
+    let grid_height = inner.height.saturating_sub(1) as usize;
     let grid_width = inner.width as usize;
 
     let mut lines = build_layout_map(
@@ -502,18 +531,6 @@ fn render_map(frame: &mut Frame, app: &App, area: Rect) {
     } else {
         lines.push(Line::from("  No monitor selected"));
     }
-
-    // Keybindings
-    lines.push(Line::from(vec![
-        Span::styled("  ←→↑↓ ", Style::default().fg(Color::Cyan)),
-        Span::styled("move   ", Style::default().fg(Color::DarkGray)),
-        Span::styled("+/- ", Style::default().fg(Color::Cyan)),
-        Span::styled("zoom   ", Style::default().fg(Color::DarkGray)),
-        Span::styled("[] ", Style::default().fg(Color::Cyan)),
-        Span::styled("switch   ", Style::default().fg(Color::DarkGray)),
-        Span::styled("t ", Style::default().fg(Color::Cyan)),
-        Span::styled("on/off", Style::default().fg(Color::DarkGray)),
-    ]));
 
     frame.render_widget(Paragraph::new(lines), inner);
 }
@@ -872,11 +889,26 @@ fn render_scale(
         },
     ];
 
+    let title = if focused {
+        Line::from(vec![
+            Span::styled(" Scale ", Style::default().fg(Color::Blue)),
+            Span::styled(
+                "\u{2190}\u{2192} adjust ",
+                Style::default().fg(Color::DarkGray),
+            ),
+        ])
+    } else {
+        Line::from(Span::styled(
+            " Scale ",
+            Style::default().fg(Color::DarkGray),
+        ))
+    };
+
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(border_color))
-        .title(" Scale ");
+        .title(title);
 
     frame.render_widget(Paragraph::new(lines).block(block), area);
 }
@@ -923,11 +955,26 @@ fn render_transform(
         })
         .collect();
 
+    let title = if focused {
+        Line::from(vec![
+            Span::styled(" Transform ", Style::default().fg(Color::Blue)),
+            Span::styled(
+                "\u{2191}\u{2193} select ",
+                Style::default().fg(Color::DarkGray),
+            ),
+        ])
+    } else {
+        Line::from(Span::styled(
+            " Transform ",
+            Style::default().fg(Color::DarkGray),
+        ))
+    };
+
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(border_color))
-        .title(" Transform ");
+        .title(title);
 
     let list = List::new(items)
         .block(block)
