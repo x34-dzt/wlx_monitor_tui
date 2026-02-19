@@ -388,27 +388,171 @@ impl App {
     pub fn toggle_monitor(&mut self) {
         if self.pending_toggle_warning {
             self.pending_toggle_warning = false;
-            if let Some(monitor) = self.selected_monitor() {
-                let _ = self.controller.send(WlMonitorAction::Toggle {
-                    name: monitor.name.clone(),
-                    mode: None,
-                });
-                self.needs_save = true;
-            }
+            let Some(monitor) = self.monitors.get(self.selected_monitor) else {
+                return;
+            };
+            self.perform_toggle(&monitor.name.clone(), monitor.enabled);
             return;
         }
 
-        if let Some(monitor) = self.selected_monitor() {
-            if monitor.enabled && self.enabled_count() == 1 {
-                self.pending_toggle_warning = true;
-                return;
-            }
-            let _ = self.controller.send(WlMonitorAction::Toggle {
-                name: monitor.name.clone(),
-                mode: None,
-            });
-            self.needs_save = true;
+        let Some(monitor) = self.monitors.get(self.selected_monitor) else {
+            return;
+        };
+
+        if monitor.enabled && self.enabled_count() == 1 {
+            self.pending_toggle_warning = true;
+            return;
         }
+        self.perform_toggle(&monitor.name.clone(), monitor.enabled);
+    }
+
+    fn perform_toggle(&mut self, monitor_name: &str, currently_enabled: bool) {
+        let will_enable = !currently_enabled;
+        let position = if will_enable {
+            let saved_pos = xwlm_cfg::parse::get_saved_monitor_position(
+                self.compositor,
+                &self.monitor_config_path,
+                monitor_name,
+            );
+            let (w, h) = self
+                .monitors
+                .iter()
+                .find(|m| m.name == monitor_name)
+                .map(effective_dimensions)
+                .unwrap_or((1920, 1080));
+
+            if let Some(saved) = saved_pos {
+                let pos = (saved.x, saved.y);
+                if self.position_overlaps(monitor_name, pos, (w, h)) {
+                    Some(self.calculate_closest_non_overlapping_position(
+                        monitor_name, pos, (w, h),
+                    ))
+                } else {
+                    Some(pos)
+                }
+            } else {
+                Some(self.calculate_non_overlapping_position(monitor_name))
+            }
+        } else {
+            None
+        };
+
+        let _ = self.controller.send(WlMonitorAction::Toggle {
+            name: monitor_name.to_string(),
+            mode: None,
+            position,
+        });
+
+        self.needs_save = true;
+    }
+
+    fn position_overlaps(
+        &self,
+        exclude_name: &str,
+        pos: (i32, i32),
+        size: (i32, i32),
+    ) -> bool {
+        let (x1, y1) = pos;
+        let (w1, h1) = size;
+
+        self.monitors.iter().any(|m| {
+            if m.name == exclude_name || !m.enabled {
+                return false;
+            }
+            let (x2, y2) = (m.position.x, m.position.y);
+            let (w2, h2) = effective_dimensions(m);
+
+            x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2
+        })
+    }
+
+    fn calculate_closest_non_overlapping_position(
+        &self,
+        exclude_name: &str,
+        preferred_pos: (i32, i32),
+        size: (i32, i32),
+    ) -> (i32, i32) {
+        let (w, h) = size;
+        let enabled_monitors: Vec<&WlMonitor> = self
+            .monitors
+            .iter()
+            .filter(|m| m.enabled && m.name != exclude_name)
+            .collect();
+
+        if enabled_monitors.is_empty() {
+            return preferred_pos;
+        }
+
+        let mut candidates: Vec<(i32, i32)> = Vec::new();
+
+        let min_left = enabled_monitors
+            .iter()
+            .map(|m| m.position.x)
+            .min()
+            .unwrap_or(0);
+        candidates.push((min_left - w, 0));
+
+        let max_right = enabled_monitors
+            .iter()
+            .map(|m| {
+                let (mw, _) = effective_dimensions(m);
+                m.position.x + mw
+            })
+            .max()
+            .unwrap_or(0);
+        candidates.push((max_right, 0));
+
+        let min_top = enabled_monitors
+            .iter()
+            .map(|m| m.position.y)
+            .min()
+            .unwrap_or(0);
+        candidates.push((0, min_top - h));
+
+        let max_bottom = enabled_monitors
+            .iter()
+            .map(|m| {
+                let (_, mh) = effective_dimensions(m);
+                m.position.y + mh
+            })
+            .max()
+            .unwrap_or(0);
+        candidates.push((0, max_bottom));
+
+        candidates
+            .into_iter()
+            .filter(|pos| !self.position_overlaps(exclude_name, *pos, size))
+            .map(|pos| {
+                let dist = (pos.0 - preferred_pos.0).abs()
+                    + (pos.1 - preferred_pos.1).abs();
+                (dist, pos)
+            })
+            .min_by_key(|(d, _)| *d)
+            .map(|(_, pos)| pos)
+            .unwrap_or((max_right, 0))
+    }
+
+    fn calculate_non_overlapping_position(&self, exclude_name: &str) -> (i32, i32) {
+        let enabled_monitors: Vec<&WlMonitor> = self
+            .monitors
+            .iter()
+            .filter(|m| m.enabled && m.name != exclude_name)
+            .collect();
+
+        if enabled_monitors.is_empty() {
+            return (0, 0);
+        }
+
+        let max_right = enabled_monitors
+            .iter()
+            .map(|m| {
+                let (w, _) = effective_dimensions(m);
+                m.position.x + w
+            })
+            .max()
+            .unwrap_or(0);
+
+        (max_right, 0)
     }
 
     pub fn dismiss_warning(&mut self) {

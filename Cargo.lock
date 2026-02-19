@@ -2116,9 +2116,9 @@ dependencies = [
 
 [[package]]
 name = "wlx_monitors"
-version = "0.1.5"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5df5e2c3a9024aaa6926ed0ef78d01416b753c8c5995efbfbf03541c2ca58dc0"
+checksum = "240a11d79541a491438c20df3d496df9df7b0467c552cf3bce7d74e0c9b0f8c6"
 dependencies = [
  "rustix",
  "wayland-client",

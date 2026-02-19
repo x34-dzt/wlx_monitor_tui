@@ -1,5 +1,6 @@
 pub mod extract;
 pub mod format;
+pub mod parse;
 pub mod workspace;
 
 use std::env;

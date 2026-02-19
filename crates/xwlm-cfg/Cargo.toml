@@ -7,4 +7,4 @@ license = "MIT"
 repository = "https://github.com/x34-dzt/xwlm"
 
 [dependencies]
-wlx_monitors = "0.1"
+wlx_monitors = "0.1.7"
