@@ -2,6 +2,9 @@
 name = "xwlm-cfg"
 version = "0.1.0"
 edition = "2024"
+description = "Compositor detection, config extraction, and formatting for xwlm"
+license = "MIT"
+repository = "https://github.com/x34-dzt/xwlm"
 
 [dependencies]
 wlx_monitors = "0.1"
