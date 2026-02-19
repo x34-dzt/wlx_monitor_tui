@@ -2128,7 +2128,7 @@ dependencies = [
 
 [[package]]
 name = "xwlm"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "color-eyre",
  "crossterm",
