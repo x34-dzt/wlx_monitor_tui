@@ -2,6 +2,10 @@
 
 A TUI for managing your Wayland monitors. Supports Hyprland, Sway, and River.
 
+[![Crates.io](https://img.shields.io/crates/v/xwlm)](https://crates.io/crates/xwlm)
+[![Downloads](https://img.shields.io/crates/d/xwlm)](https://crates.io/crates/xwlm)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ![xwlm](assets/xwlm.png)
 
 ## About
