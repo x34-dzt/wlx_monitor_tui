@@ -148,21 +148,20 @@ pub fn run(
         {
             match (&state.phase, k.code) {
                 (SetupPhase::Extraction, KeyCode::Enter) => {
-                    if let Some(ref result) = state.extraction
-                        && !result.already_consolidated
+                    let Some(ref result) = state.extraction else {
+                        continue;
+                    };
+                    if !result.already_consolidated
+                        && let Err(e) = result.plan.apply()
                     {
-                        if let Err(e) = result.plan.apply() {
-                            state.error =
-                                Some(format!("Extraction failed: {e}"));
-                            state.phase = SetupPhase::Manual;
-                            continue;
-                        }
-
-                        return Ok(Some(AppConfig {
-                            monitor_config_path: result.output_path.clone(),
-                            workspace_count: 10,
-                        }));
+                        state.error = Some(format!("Extraction failed: {e}"));
+                        state.phase = SetupPhase::Manual;
+                        continue;
                     }
+                    return Ok(Some(AppConfig {
+                        monitor_config_path: result.output_path.clone(),
+                        workspace_count: 10,
+                    }));
                 }
                 (SetupPhase::Extraction, KeyCode::Char('m')) => {
                     state.phase = SetupPhase::Manual;
