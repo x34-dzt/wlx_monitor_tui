@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.9] - 2026-02-20
+
+### Added
+
+- Validate monitor config file exists on startup: re-runs setup wizard if config file is missing
+- `expand_tilde()` helper in `xwlm-cfg` for path expansion
+- `monitor_config_exists()` function to check if monitor config file exists
+
+### Fixed
+
+- Extraction order fix: create monitors.conf first, then add source line, then remove monitor lines from main config
+- Hyprland no longer crashes during extraction because source line is added before monitor lines are removed
+
+### Changed
+
+- Source line now uses full path: `source = ~/.config/hypr/monitors.conf` instead of `source = monitors.conf`
+
 ## [0.1.8] - 2026-02-19
 
 ### Added

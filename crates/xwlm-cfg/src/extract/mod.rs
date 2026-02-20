@@ -28,35 +28,42 @@ impl ExtractionPlan {
             .main_config
             .parent()
             .ok_or("Cannot determine config directory")?;
-        let output_path = output_dir.join(
-            if self
-                .source_line
-                .as_ref()
-                .is_some_and(|l| l.contains("include"))
-            {
-                self.source_line
-                    .as_ref()
-                    .and_then(|l| l.strip_prefix("include "))
-                    .unwrap_or("outputs.conf")
-            } else {
-                self.source_line
-                    .as_ref()
-                    .and_then(|l| l.strip_prefix("source = "))
-                    .unwrap_or("monitors.conf")
-            },
-        );
 
+        let output_filename = self.extract_output_filename();
+        let output_path = output_dir.join(output_filename);
+
+        // Step 1: Write the monitors.conf file first
         std::fs::write(&output_path, &self.output_content).map_err(|e| {
             format!("Failed to write {}: {e}", output_path.display())
         })?;
 
+        // Step 2: Write modified files, adding source line to main_config if needed
         for (path, content) in &self.modified_files {
-            std::fs::write(path, content).map_err(|e| {
-                format!("Failed to write {}: {e}", path.display())
-            })?;
+            if path == &self.main_config {
+                // For main config, add source line to the modified content
+                let mut final_content = content.clone();
+                if !final_content.ends_with('\n') {
+                    final_content.push('\n');
+                }
+                if let Some(ref line) = self.source_line {
+                    final_content.push('\n');
+                    final_content.push_str(line);
+                    final_content.push('\n');
+                }
+                std::fs::write(path, final_content).map_err(|e| {
+                    format!("Failed to write {}: {e}", path.display())
+                })?;
+            } else {
+                std::fs::write(path, content).map_err(|e| {
+                    format!("Failed to write {}: {e}", path.display())
+                })?;
+            }
         }
 
-        if let Some(ref line) = self.source_line {
+        // Step 3: If main_config wasn't in modified_files but we need to add source
+        if !self.modified_files.iter().any(|(p, _)| p == &self.main_config)
+            && let Some(ref line) = self.source_line
+        {
             let mut content = std::fs::read_to_string(&self.main_config)
                 .map_err(|e| {
                     format!(
@@ -76,6 +83,65 @@ impl ExtractionPlan {
         }
 
         Ok(())
+    }
+
+    fn extract_output_filename(&self) -> &str {
+        if let Some(ref line) = self.source_line {
+            if let Some(path) = line.strip_prefix("source = ") {
+                return extract_filename(path);
+            }
+            if let Some(path) = line.strip_prefix("include ") {
+                return extract_filename(path);
+            }
+        }
+        "monitors.conf"
+    }
+}
+
+fn extract_filename(path: &str) -> &str {
+    let path = path.trim();
+    path.rsplit('/').next().unwrap_or(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_filename_with_tilde() {
+        assert_eq!(
+            extract_filename("~/.config/hypr/monitors.conf"),
+            "monitors.conf"
+        );
+    }
+
+    #[test]
+    fn test_extract_filename_with_absolute() {
+        assert_eq!(
+            extract_filename("/home/user/.config/hypr/monitors.conf"),
+            "monitors.conf"
+        );
+    }
+
+    #[test]
+    fn test_extract_filename_relative() {
+        assert_eq!(extract_filename("monitors.conf"), "monitors.conf");
+    }
+
+    #[test]
+    fn test_extract_filename_with_spaces() {
+        assert_eq!(
+            extract_filename("  ~/.config/hypr/monitors.conf  "),
+            "monitors.conf"
+        );
+    }
+
+    #[test]
+    fn test_extract_filename_nested() {
+        assert_eq!(
+            extract_filename("~/.config/hypr/subdir/monitors.conf"),
+            "monitors.conf"
+        );
     }
 }
 

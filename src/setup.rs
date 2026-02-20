@@ -212,7 +212,7 @@ pub fn run(
                         state.error = Some("Path cannot be empty".to_string());
                         continue;
                     }
-                    let expanded = expand_tilde(path);
+                    let expanded = crate::config::expand_tilde(path);
                     return Ok(Some(AppConfig {
                         monitor_config_path: expanded,
                         workspace_count: 10,
@@ -222,15 +222,6 @@ pub fn run(
             }
         }
     }
-}
-
-fn expand_tilde(path: &str) -> String {
-    if let Some(rest) = path.strip_prefix("~/")
-        && let Ok(home) = std::env::var("HOME")
-    {
-        return format!("{home}/{rest}");
-    }
-    path.to_string()
 }
 
 const LOGO: &[&str] = &[

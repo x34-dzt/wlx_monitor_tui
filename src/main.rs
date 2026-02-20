@@ -18,7 +18,6 @@ fn main() -> Result<()> {
 
     let app_config = match load_config(compositor)? {
         Some(cfg) => cfg,
-        // when we get none here, we didn't got any config so we do early Ok return
         None => return Ok(()),
     };
 
@@ -44,21 +43,29 @@ fn main() -> Result<()> {
 
 fn load_config(compositor: Compositor) -> Result<Option<AppConfig>> {
     match config::load()? {
-        // app config already exists return Some(cfg)
-        Some(cfg) => Ok(Some(cfg)),
-        None => {
-            // app config doesn't already exists run setup
-            let result = run_setup(compositor);
-            match result? {
-                // if setup is successful we return the config
-                Some(cfg) => {
-                    config::save(&cfg)?;
-                    Ok(Some(cfg))
-                }
-                // else nothing, close setup as user pressed esc
-                None => Ok(None),
+        Some(cfg) => {
+            if !config::monitor_config_exists(&cfg.monitor_config_path) {
+                eprintln!(
+                    "Monitor config file not found: {}",
+                    cfg.monitor_config_path
+                );
+                eprintln!("Re-running setup...");
+                return run_setup_and_save(compositor);
             }
+            Ok(Some(cfg))
         }
+        None => run_setup_and_save(compositor),
+    }
+}
+
+fn run_setup_and_save(compositor: Compositor) -> Result<Option<AppConfig>> {
+    let result = run_setup(compositor);
+    match result? {
+        Some(cfg) => {
+            config::save(&cfg)?;
+            Ok(Some(cfg))
+        }
+        None => Ok(None),
     }
 }
 

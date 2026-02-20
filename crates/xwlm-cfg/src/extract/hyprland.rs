@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use super::{ExtractionPlan, resolve_path};
+use super::{resolve_path, ExtractionPlan};
 
 pub fn extract(
     config_path: &Path,
@@ -45,7 +45,8 @@ pub fn extract(
     };
 
     let source_line = if !source_exists && !extracted.is_empty() {
-        Some(format!("source = {}", output_filename))
+        let source_path = get_source_path(&output_path);
+        Some(format!("source = {}", source_path))
     } else {
         None
     };
@@ -57,6 +58,21 @@ pub fn extract(
         main_config: config_path,
         source_exists,
     })
+}
+
+fn get_source_path(output_path: &Path) -> String {
+    let home = std::env::var("HOME").unwrap_or_default();
+
+    if let Ok(stripped) = output_path.strip_prefix(&home) {
+        let stripped_str = stripped.display().to_string();
+        if stripped_str.starts_with('/') {
+            format!("~{}", stripped_str)
+        } else {
+            format!("~/{}", stripped_str)
+        }
+    } else {
+        output_path.display().to_string()
+    }
 }
 
 fn parse_file(
@@ -164,4 +180,56 @@ fn parse_source_line(line: &str) -> Option<String> {
         return None;
     }
     Some(path.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_source_path_with_home() {
+        let home = std::env::var("HOME").unwrap_or_default();
+        let path =
+            PathBuf::from(format!("{}/.config/hypr/monitors.conf", home));
+        let result = get_source_path(&path);
+        assert_eq!(result, "~/.config/hypr/monitors.conf");
+    }
+
+    #[test]
+    fn test_get_source_path_without_home() {
+        let path = PathBuf::from("/etc/hypr/monitors.conf");
+        let result = get_source_path(&path);
+        assert_eq!(result, "/etc/hypr/monitors.conf");
+    }
+
+    #[test]
+    fn test_is_monitor_line() {
+        assert!(is_monitor_line("monitor=DP-1,1920x1080,0x0,1"));
+        assert!(is_monitor_line("monitor = DP-1,1920x1080,0x0,1"));
+        assert!(is_monitor_line("MONITOR=DP-1,1920x1080,0x0,1"));
+        assert!(!is_monitor_line("monitors=DP-1"));
+        assert!(!is_monitor_line("# monitor=DP-1"));
+    }
+
+    #[test]
+    fn test_is_workspace_line() {
+        assert!(is_workspace_line("workspace=1,monitor:DP-1"));
+        assert!(is_workspace_line("workspace = 1,monitor:DP-1"));
+        assert!(is_workspace_line("WORKSPACE=1,monitor:DP-1"));
+        assert!(!is_workspace_line("workspaces=1"));
+    }
+
+    #[test]
+    fn test_parse_source_line() {
+        assert_eq!(
+            parse_source_line("source = ~/.config/hypr/monitors.conf"),
+            Some("~/.config/hypr/monitors.conf".to_string())
+        );
+        assert_eq!(
+            parse_source_line("source=monitors.conf"),
+            Some("monitors.conf".to_string())
+        );
+        assert_eq!(parse_source_line("source="), None);
+        assert_eq!(parse_source_line("sourcemonitors.conf"), None);
+    }
 }
