@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.11] - 2026-02-20
+
+### Added
+
+- `--version` and `-v` flags to display current version
+
 ## [0.1.10] - 2026-02-20
 
 ### Fixed

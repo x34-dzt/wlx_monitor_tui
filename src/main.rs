@@ -3,6 +3,7 @@ mod config;
 mod setup;
 mod ui;
 
+use std::env;
 use std::sync::mpsc::{self, Receiver};
 
 use color_eyre::eyre::Result;
@@ -11,7 +12,16 @@ use xwlm_cfg::Compositor;
 
 use crate::{app::App, config::AppConfig};
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 fn main() -> Result<()> {
+    let args: Vec<String> = env::args().collect();
+    
+    if args.iter().any(|a| a == "--version" || a == "-v") {
+        println!("xwlm {}", VERSION);
+        return Ok(());
+    }
+
     color_eyre::install()?;
 
     let compositor = xwlm_cfg::detect();
