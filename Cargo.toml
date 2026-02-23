@@ -2,6 +2,9 @@
 name = "xwlm"
 version = "0.2.0"
 edition = "2024"
+description = "A TUI for managing Wayland monitor configurations (Hyprland, Sway, River)"
+license = "MIT"
+repository = "https://github.com/x34-dzt/xwlm"
 
 [dependencies]
 wlx_monitors = "0.1.8"
