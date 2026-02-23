@@ -749,6 +749,11 @@ impl App {
                     w.is_default = false;
                 }
             }
+            for w in self.workspace_assignments.iter_mut() {
+                if w.is_default && w.monitor_idx == Some(target_monitor) {
+                    w.is_default = false;
+                }
+            }
         }
 
         self.pending_workspaces.insert(ws_idx, effective);

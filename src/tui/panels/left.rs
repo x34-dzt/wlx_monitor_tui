@@ -1,7 +1,9 @@
 use crate::{
     constants::TRANSFORMS,
     state::{App, Panel},
-    tui::key_binds::{get_monitor_keybinds, get_scale_keybinds, get_transform_keybinds},
+    tui::key_binds::{
+        get_monitor_keybinds, get_scale_keybinds, get_transform_keybinds,
+    },
     utils::{self, effective_dimensions, monitor_resolution, transform_label},
 };
 
@@ -10,7 +12,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
+    widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph},
 };
 use wlx_monitors::WlTransform;
 
@@ -98,7 +100,10 @@ fn render_map(frame: &mut Frame, app: &App, area: Rect) {
                     format!("{}×{}  ", ew, eh),
                     Style::default().fg(Color::White),
                 ),
-                Span::styled(format!("({},{})  ", dx, dy), Style::default().fg(pos_color)),
+                Span::styled(
+                    format!("({},{})  ", dx, dy),
+                    Style::default().fg(pos_color),
+                ),
                 Span::styled(
                     format!("{}×  ", monitor.scale),
                     Style::default().fg(Color::White),
@@ -132,9 +137,14 @@ fn render_map(frame: &mut Frame, app: &App, area: Rect) {
                 ),
                 Span::styled(
                     "OFF ",
-                    Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::Red)
+                        .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled("— t to enable", Style::default().fg(Color::DarkGray)),
+                Span::styled(
+                    "— t to enable",
+                    Style::default().fg(Color::DarkGray),
+                ),
             ]));
         }
     } else {
@@ -144,7 +154,11 @@ fn render_map(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(Paragraph::new(lines), inner);
 }
 
-fn build_layout_map<'a>(app: &App, width: usize, height: usize) -> Vec<Line<'a>> {
+fn build_layout_map<'a>(
+    app: &App,
+    width: usize,
+    height: usize,
+) -> Vec<Line<'a>> {
     let monitors = &app.monitors;
     let selected_idx = app.selected_monitor;
     let zoom = app.map_zoom;
@@ -252,7 +266,8 @@ fn build_layout_map<'a>(app: &App, width: usize, height: usize) -> Vec<Line<'a>>
         let cx = pad + ((rect.px - min_x) as f64 / ppc) as usize;
         let cy = ((rect.py - min_y) as f64 / (ppc * CHAR_ASPECT)) as usize;
         let cw = (rect.pw as f64 / ppc).round().max(1.0) as usize;
-        let ch = (rect.ph as f64 / (ppc * CHAR_ASPECT)).round().max(1.0) as usize;
+        let ch =
+            (rect.ph as f64 / (ppc * CHAR_ASPECT)).round().max(1.0) as usize;
 
         let x1 = cx.min(width.saturating_sub(1));
         let y1 = cy.min(height.saturating_sub(1));
@@ -344,11 +359,13 @@ fn build_layout_map<'a>(app: &App, width: usize, height: usize) -> Vec<Line<'a>>
                     break;
                 }
                 let truncated: String = text.chars().take(inner_w).collect();
-                let text_start = x1 + 1 + inner_w.saturating_sub(truncated.len()) / 2;
+                let text_start =
+                    x1 + 1 + inner_w.saturating_sub(truncated.len()) / 2;
                 for (j, ch) in truncated.chars().enumerate() {
                     let col = text_start + j;
                     if col < x2 - 1 {
-                        grid[row][col] = (ch, text_fg, *bold || rect.is_selected);
+                        grid[row][col] =
+                            (ch, text_fg, *bold || rect.is_selected);
                     }
                 }
             }
@@ -528,4 +545,102 @@ fn render_transform(frame: &mut Frame, app: &mut App, area: Rect) {
         );
 
     frame.render_stateful_widget(list, area, &mut app.transform_state);
+}
+
+pub fn render_warning_modal(frame: &mut Frame, area: Rect, config_path: &str) {
+    let path_w = config_path.len() as u16 + 14;
+    let modal_w = path_w.max(48).min(area.width.saturating_sub(4));
+    let modal_h = 15u16.min(area.height.saturating_sub(2));
+    let x = (area.width.saturating_sub(modal_w)) / 2;
+    let y = (area.height.saturating_sub(modal_h)) / 2;
+    let modal_area = Rect::new(x, y, modal_w, modal_h);
+
+    frame.render_widget(Clear, modal_area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Red))
+        .title(" Warning ");
+
+    let inner = block.inner(modal_area);
+    frame.render_widget(block, modal_area);
+
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(1), Constraint::Length(3)])
+        .split(inner);
+
+    let text = vec![
+        Line::from(vec![Span::styled(
+            " ⚠ Disable your last monitor?",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        )]),
+        Line::from(vec![Span::styled(
+            " No way to undo from here.",
+            Style::default().fg(Color::Yellow),
+        )]),
+        Line::from(""),
+        Line::from(vec![Span::styled(
+            " To recover, you'll need to:",
+            Style::default().fg(Color::White),
+        )]),
+        Line::from(vec![Span::styled(
+            " 1. Reboot your machine",
+            Style::default().fg(Color::DarkGray),
+        )]),
+        Line::from(vec![Span::styled(
+            " 2. Open a TTY session",
+            Style::default().fg(Color::DarkGray),
+        )]),
+        Line::from(vec![
+            Span::styled(" 3. Edit ", Style::default().fg(Color::DarkGray)),
+            Span::styled(config_path, Style::default().fg(Color::Cyan)),
+        ]),
+        Line::from(vec![Span::styled(
+            "    and remove the disable line",
+            Style::default().fg(Color::DarkGray),
+        )]),
+        Line::from(vec![Span::styled(
+            " 4. Reboot and log into your compositor",
+            Style::default().fg(Color::DarkGray),
+        )]),
+    ];
+
+    let buttons = vec![
+        Line::from(vec![
+            Span::styled(" ┌───────┐ ", Style::default().fg(Color::Red)),
+            Span::styled("┌──────┐", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::styled(" │ ", Style::default().fg(Color::Red)),
+            Span::styled(
+                "[Y]",
+                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("es ", Style::default().fg(Color::Red)),
+            Span::styled("│ ", Style::default().fg(Color::Red)),
+            Span::styled("│ ", Style::default().fg(Color::Green)),
+            Span::styled(
+                "[N]",
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled("o ", Style::default().fg(Color::Green)),
+            Span::styled("│", Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::styled(" └───────┘ ", Style::default().fg(Color::Red)),
+            Span::styled("└──────┘", Style::default().fg(Color::Green)),
+        ]),
+    ];
+
+    let text_widget =
+        Paragraph::new(text).style(Style::default().fg(Color::White));
+    frame.render_widget(text_widget, layout[0]);
+
+    let buttons_widget =
+        Paragraph::new(buttons).style(Style::default().fg(Color::White));
+    frame.render_widget(buttons_widget, layout[1]);
 }

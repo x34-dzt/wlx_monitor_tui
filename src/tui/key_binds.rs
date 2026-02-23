@@ -11,7 +11,7 @@ use ratatui::{
     widgets::Paragraph,
 };
 
-pub fn keybinds(frame: &mut Frame, area: Rect, app: &App) {
+pub fn config(frame: &mut Frame, area: Rect, app: &App) {
     let panel = &app.panel;
     let mut keys = vec![
         Span::styled(
@@ -38,12 +38,18 @@ pub fn keybinds(frame: &mut Frame, area: Rect, app: &App) {
             keys.push(Span::styled("]", Style::default().fg(Color::Cyan)));
         }
         Panel::Mode => {
-            keys.push(Span::styled("[ Modes | ", Style::default().fg(Color::Cyan)));
+            keys.push(Span::styled(
+                "[ Modes | ",
+                Style::default().fg(Color::Cyan),
+            ));
             get_modes_keybinds(&mut keys);
             keys.push(Span::styled("]", Style::default().fg(Color::Cyan)));
         }
         Panel::Scale => {
-            keys.push(Span::styled("[ Scale | ", Style::default().fg(Color::Cyan)));
+            keys.push(Span::styled(
+                "[ Scale | ",
+                Style::default().fg(Color::Cyan),
+            ));
             get_scale_keybinds(&mut keys);
             keys.push(Span::styled("]", Style::default().fg(Color::Cyan)));
         }
@@ -93,7 +99,10 @@ pub fn get_modes_keybinds(keys: &mut Vec<Span<'static>>) {
     ));
 }
 
-pub fn get_workspaces_keybinds(keys: &mut Vec<Span<'static>>, compositor: Compositor) {
+pub fn get_workspaces_keybinds(
+    keys: &mut Vec<Span<'static>>,
+    compositor: Compositor,
+) {
     keys.push(Span::styled("←→ ", Style::default().fg(Color::Cyan)));
     keys.push(Span::styled(
         "assign  ",
