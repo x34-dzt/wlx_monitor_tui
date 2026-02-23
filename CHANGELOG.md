@@ -19,6 +19,8 @@ All notable changes to this project will be documented in this file.
 - Setup wizard safety warnings - warns users about using main config files (double-confirm)
 - Auto-detection if monitor config file is deleted - re-runs setup wizard
 - Comments in config files - warns users not to edit manually
+- Workspace panel - assign workspaces to monitors with persistence
+- Workspace defaults support for Hyprland - default and persistent workspace rules
 
 ### Fixed
 
