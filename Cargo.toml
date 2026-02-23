@@ -4,7 +4,7 @@ version = "0.2.0"
 edition = "2024"
 
 [dependencies]
-wlx_monitors = { path = "../wlx_monitors" }
+wlx_monitors = "0.1.8"
 ratatui = "0.30.0"
 serde = { version = "1", features = ["derive"] }
 toml = "1.0.3"
