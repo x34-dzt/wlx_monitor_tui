@@ -1,9 +1,6 @@
-pub mod hyprland;
-pub mod sway;
+use std::{env, path::PathBuf};
 
-use std::path::PathBuf;
-
-use crate::Compositor;
+use crate::compositor::{Compositor, hyprland, sway};
 
 #[derive(Debug)]
 pub struct ExtractionPlan {
@@ -33,9 +30,10 @@ impl ExtractionPlan {
         let output_path = output_dir.join(output_filename);
 
         // Step 1: Write the monitors.conf file first
-        std::fs::write(&output_path, &self.output_content).map_err(|e| {
-            format!("Failed to write {}: {e}", output_path.display())
-        })?;
+        let comment = "# This file is managed by xwlm. Do not edit manually.\n\n";
+        let final_content = format!("{}{}", comment, self.output_content);
+        std::fs::write(&output_path, final_content)
+            .map_err(|e| format!("Failed to write {}: {e}", output_path.display()))?;
 
         // Step 2: Write modified files, adding source line to main_config if needed
         for (path, content) in &self.modified_files {
@@ -50,36 +48,31 @@ impl ExtractionPlan {
                     final_content.push_str(line);
                     final_content.push('\n');
                 }
-                std::fs::write(path, final_content).map_err(|e| {
-                    format!("Failed to write {}: {e}", path.display())
-                })?;
+                std::fs::write(path, final_content)
+                    .map_err(|e| format!("Failed to write {}: {e}", path.display()))?;
             } else {
-                std::fs::write(path, content).map_err(|e| {
-                    format!("Failed to write {}: {e}", path.display())
-                })?;
+                std::fs::write(path, content)
+                    .map_err(|e| format!("Failed to write {}: {e}", path.display()))?;
             }
         }
 
         // Step 3: If main_config wasn't in modified_files but we need to add source
-        if !self.modified_files.iter().any(|(p, _)| p == &self.main_config)
+        if !self
+            .modified_files
+            .iter()
+            .any(|(p, _)| p == &self.main_config)
             && let Some(ref line) = self.source_line
         {
             let mut content = std::fs::read_to_string(&self.main_config)
-                .map_err(|e| {
-                    format!(
-                        "Failed to read {}: {e}",
-                        self.main_config.display()
-                    )
-                })?;
+                .map_err(|e| format!("Failed to read {}: {e}", self.main_config.display()))?;
             if !content.ends_with('\n') {
                 content.push('\n');
             }
             content.push('\n');
             content.push_str(line);
             content.push('\n');
-            std::fs::write(&self.main_config, content).map_err(|e| {
-                format!("Failed to write {}: {e}", self.main_config.display())
-            })?;
+            std::fs::write(&self.main_config, content)
+                .map_err(|e| format!("Failed to write {}: {e}", self.main_config.display()))?;
         }
 
         Ok(())
@@ -98,9 +91,46 @@ impl ExtractionPlan {
     }
 }
 
+pub fn main_config_path(compositor: Compositor) -> Option<PathBuf> {
+    let home = env::var("HOME").ok()?;
+    let path = match compositor {
+        Compositor::Hyprland => format!("{home}/.config/hypr/hyprland.conf"),
+        Compositor::Sway => format!("{home}/.config/sway/config"),
+        _ => return None,
+    };
+    let p = PathBuf::from(path);
+    if p.exists() { Some(p) } else { None }
+}
+
 fn extract_filename(path: &str) -> &str {
     let path = path.trim();
     path.rsplit('/').next().unwrap_or(path)
+}
+
+pub fn extract_monitors(
+    config_path: &std::path::Path,
+    compositor: Compositor,
+    output_filename: &str,
+) -> Result<ExtractionPlan, String> {
+    match compositor {
+        Compositor::Hyprland => hyprland::extract(config_path, output_filename),
+        Compositor::Sway => sway::extract(config_path, output_filename),
+        _ => Err(format!(
+            "Config extraction not supported for {}",
+            compositor.label()
+        )),
+    }
+}
+
+pub fn resolve_path(base_dir: &std::path::Path, path: &str) -> PathBuf {
+    let path = path.trim();
+    if let Some(rest) = path.strip_prefix("~/")
+        && let Ok(home) = std::env::var("HOME")
+    {
+        return PathBuf::from(format!("{home}/{rest}"));
+    }
+    let p = PathBuf::from(path);
+    if p.is_absolute() { p } else { base_dir.join(p) }
 }
 
 #[cfg(test)]
@@ -143,30 +173,4 @@ mod tests {
             "monitors.conf"
         );
     }
-}
-
-pub fn extract_monitors(
-    config_path: &std::path::Path,
-    compositor: Compositor,
-    output_filename: &str,
-) -> Result<ExtractionPlan, String> {
-    match compositor {
-        Compositor::Hyprland => hyprland::extract(config_path, output_filename),
-        Compositor::Sway => sway::extract(config_path, output_filename),
-        _ => Err(format!(
-            "Config extraction not supported for {}",
-            compositor.label()
-        )),
-    }
-}
-
-pub(crate) fn resolve_path(base_dir: &std::path::Path, path: &str) -> PathBuf {
-    let path = path.trim();
-    if let Some(rest) = path.strip_prefix("~/")
-        && let Ok(home) = std::env::var("HOME")
-    {
-        return PathBuf::from(format!("{home}/{rest}"));
-    }
-    let p = PathBuf::from(path);
-    if p.is_absolute() { p } else { base_dir.join(p) }
 }

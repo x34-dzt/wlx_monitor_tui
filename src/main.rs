@@ -1,94 +1,57 @@
-mod app;
-mod config;
+mod compositor;
+mod constants;
 mod setup;
-mod ui;
+mod state;
+mod tui;
+mod utils;
+mod xwlm_config;
 
-use std::env;
-use std::sync::mpsc::{self, Receiver};
+use std::{error::Error, io, sync::mpsc};
 
-use color_eyre::eyre::Result;
-use wlx_monitors::{WlMonitorEvent, WlMonitorManager};
-use xwlm_cfg::Compositor;
+use wlx_monitors::{WlMonitorManager, WlMonitorManagerError};
 
-use crate::{app::App, config::AppConfig};
+use crate::{state::App, xwlm_config::Config};
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
-fn main() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    
-    if args.iter().any(|a| a == "--version" || a == "-v") {
-        println!("xwlm {}", VERSION);
-        return Ok(());
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
     }
+}
 
-    color_eyre::install()?;
+fn run() -> Result<(), Box<dyn Error>> {
+    let (wlx_emitter, wlx_events) = mpsc::sync_channel(16);
+    let (wlx_action_handler, wlx_action_rx) = mpsc::sync_channel(16);
+    let (wlx_manager, wlx_eq) = WlMonitorManager::new_connection(wlx_emitter, wlx_action_rx)?;
 
-    let compositor = xwlm_cfg::detect();
-
-    let app_config = match load_config(compositor)? {
-        Some(cfg) => cfg,
-        None => return Ok(()),
-    };
-
-    let (emitter, event_receiver) = mpsc::sync_channel(16);
-    let (controller, action_receiver) = mpsc::sync_channel(16);
-
-    let (state, event_queue) =
-        WlMonitorManager::new_connection(emitter, action_receiver)
-            .expect("Failed to connect to Wayland");
-
-    std::thread::spawn(move || {
-        state.run(event_queue).expect("Event loop error");
+    std::thread::spawn(move || -> Result<(), WlMonitorManagerError> {
+        wlx_manager.run(wlx_eq)?;
+        Ok(())
     });
 
-    let app = app::App::new(
-        controller,
-        compositor,
-        app_config.monitor_config_path,
-        app_config.workspace_count,
+    let Some(config) = load()? else { return Ok(()) };
+
+    let mut app = App::new(
+        wlx_action_handler,
+        config.monitor_config_path,
+        config.workspace_count,
     );
-    run_xwlm(app, event_receiver)
+    tui::run(&mut app, wlx_events)?;
+    Ok(())
 }
 
-fn load_config(compositor: Compositor) -> Result<Option<AppConfig>> {
-    match config::load()? {
-        Some(cfg) => {
-            if !config::monitor_config_exists(&cfg.monitor_config_path) {
-                eprintln!(
-                    "Monitor config file not found: {}",
-                    cfg.monitor_config_path
-                );
-                eprintln!("Re-running setup...");
-                return run_setup_and_save(compositor);
-            }
-            Ok(Some(cfg))
-        }
-        None => run_setup_and_save(compositor),
+fn load() -> io::Result<Option<Config>> {
+    let comp = compositor::detect();
+    let Ok(cfg) = xwlm_config::load_config() else {
+        return setup::run(comp).map_err(io::Error::other);
+    };
+
+    let path_str = cfg.monitor_config_path.to_string_lossy();
+    if !utils::monitor_config_exists(&path_str) {
+        eprintln!("Monitor config file not found: {}", path_str);
+        eprintln!("Re-running setup...");
+        return setup::run(comp).map_err(io::Error::other);
     }
-}
 
-fn run_setup_and_save(compositor: Compositor) -> Result<Option<AppConfig>> {
-    let result = run_setup(compositor);
-    match result? {
-        Some(cfg) => {
-            config::save(&cfg)?;
-            Ok(Some(cfg))
-        }
-        None => Ok(None),
-    }
-}
-
-fn run_setup(compositor: Compositor) -> Result<Option<AppConfig>> {
-    let terminal = ratatui::init();
-    let result = setup::run(terminal, compositor);
-    ratatui::restore();
-    result
-}
-
-fn run_xwlm(mut app: App, event_rx: Receiver<WlMonitorEvent>) -> Result<()> {
-    let terminal = ratatui::init();
-    let result = ui::run(terminal, &mut app, event_rx);
-    ratatui::restore();
-    result
+    Ok(Some(cfg))
 }

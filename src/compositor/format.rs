@@ -1,9 +1,9 @@
-use std::io;
 use std::process::Command;
+use std::{io, path::PathBuf};
 
 use wlx_monitors::{WlMonitor, WlTransform};
 
-use crate::Compositor;
+use crate::compositor::{workspace_config::WorkspaceRule, Compositor};
 
 pub fn reload(compositor: Compositor) {
     let result = match compositor {
@@ -18,9 +18,9 @@ pub fn reload(compositor: Compositor) {
 
 pub fn save_monitor_config(
     compositor: Compositor,
-    path: &str,
+    path: &PathBuf,
     monitors: &[WlMonitor],
-    workspaces: &[(usize, Option<String>)],
+    workspaces: &[WorkspaceRule],
 ) -> io::Result<()> {
     let content = match compositor {
         Compositor::Hyprland => format_hyprland(monitors, workspaces),
@@ -28,7 +28,9 @@ pub fn save_monitor_config(
         Compositor::River => format_river(monitors),
         Compositor::Unknown => return Ok(()),
     };
-    std::fs::write(path, content)
+    let comment = "# This file is managed by xwlm. Do not edit manually.\n\n";
+    let final_content = format!("{}{}", comment, content);
+    std::fs::write(path, final_content)
 }
 
 fn current_mode(monitor: &WlMonitor) -> (i32, i32, i32) {
@@ -76,7 +78,7 @@ fn transform_to_sway(t: WlTransform) -> &'static str {
 
 fn format_hyprland(
     monitors: &[WlMonitor],
-    workspaces: &[(usize, Option<String>)],
+    workspaces: &[WorkspaceRule],
 ) -> String {
     let mut lines = Vec::new();
     for m in monitors {
@@ -102,9 +104,15 @@ fn format_hyprland(
 
     let ws_lines: Vec<String> = workspaces
         .iter()
-        .filter_map(|(id, name)| {
-            name.as_ref()
-                .map(|n| format!("workspace = {}, monitor:{}", id, n))
+        .map(|ws| {
+            let mut rules = format!("monitor:{}", ws.monitor);
+            if ws.is_default {
+                rules.push_str(",default:true");
+            }
+            if ws.is_persistent {
+                rules.push_str(",persistent:true");
+            }
+            format!("workspace = {}, {}", ws.id, rules)
         })
         .collect();
     if !ws_lines.is_empty() {
@@ -116,10 +124,7 @@ fn format_hyprland(
     lines.join("\n")
 }
 
-fn format_sway(
-    monitors: &[WlMonitor],
-    workspaces: &[(usize, Option<String>)],
-) -> String {
+fn format_sway(monitors: &[WlMonitor], workspaces: &[WorkspaceRule]) -> String {
     let mut blocks = Vec::new();
     for m in monitors {
         if !m.enabled {
@@ -131,18 +136,13 @@ fn format_sway(
         let transform = transform_to_sway(m.transform);
         blocks.push(format!(
             "output {} {{\n    mode {}x{}@{}Hz\n    pos {} {}\n    scale {}\n    transform {}\n}}",
-            m.name, w, h, refresh,
-            m.position.x, m.position.y,
-            scale, transform,
+            m.name, w, h, refresh, m.position.x, m.position.y, scale, transform,
         ));
     }
 
     let ws_lines: Vec<String> = workspaces
         .iter()
-        .filter_map(|(id, name)| {
-            name.as_ref()
-                .map(|n| format!("workspace {} output {}", id, n))
-        })
+        .map(|ws| format!("workspace {} output {}", ws.id, ws.monitor))
         .collect();
     if !ws_lines.is_empty() {
         blocks.push(ws_lines.join("\n"));

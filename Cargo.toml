@@ -1,23 +1,12 @@
-[workspace]
-members = [".", "crates/*"]
-resolver = "2"
-
 [package]
 name = "xwlm"
-version = "0.1.11"
+version = "0.2.0"
 edition = "2024"
-description = "A TUI for managing Wayland monitor configurations (Hyprland, Sway, River)"
-license = "MIT"
-repository = "https://github.com/x34-dzt/xwlm"
-keywords = ["wayland", "monitor", "tui", "hyprland", "sway"]
-categories = ["command-line-utilities"]
 
 [dependencies]
-xwlm-cfg = { path = "crates/xwlm-cfg", version = "0.1.1" }
-color-eyre = "0.6.5"
+wlx_monitors = { path = "../wlx_monitors" }
 ratatui = "0.30.0"
-crossterm = "0.29"
-dirs = "6"
 serde = { version = "1", features = ["derive"] }
-toml = "1.0.2"
-wlx_monitors = "0.1.7"
+toml = "1.0.3"
+thiserror = "2.0.18"
+crossterm = "0.29.0"

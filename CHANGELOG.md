@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-02-23
+
+### Breaking Changes
+
+- Removed `xwlm-cfg` crate - compositor logic now integrated into main crate
+- Config struct fields renamed: `comp_monitors_config_path` → `monitor_config_path`, `comp_workspace_count` → `workspace_count`
+
+### Added
+
+- Monitor index bounds checking - prevents panics when monitors are added/removed
+- User-facing error system - errors now display in TUI instead of just stderr
+- Stale pending positions cleanup - automatically cleans up invalid positions when monitors are removed
+- Clear pending state on quit - unapplied changes are reset when exiting
+- Config file path validation - validates that monitor config path exists on startup
+- Setup wizard safety warnings - warns users about using main config files (double-confirm)
+- Auto-detection if monitor config file is deleted - re-runs setup wizard
+- Comments in config files - warns users not to edit manually
+
+### Fixed
+
+- Monitor index bounds validation via `sanitize_selection()`
+- Nested if statement in `remove_monitor()` - collapsed for clarity
+- Unused variable warnings suppressed properly
+- Debug code removed
+- Path validation now supports both absolute paths and tilde paths
+- Fixed issue where setup would run every time even when config was valid
+
+### Changed
+
+- Replaced `color-eyre` with `thiserror` for error handling
+- Default config path now shows tilde (~) instead of expanded path
+- Setup manual input shows friendly path with tilde
+
 ## [0.1.11] - 2026-02-20
 
 ### Added
